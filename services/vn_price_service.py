@@ -21,23 +21,20 @@ VN_CACHE_TTL = timedelta(hours=6)
 RATE_CACHE_TTL = timedelta(minutes=30)
 
 # ─── URLs ────────────────────────────────────────────────────
-PETROLIMEX_URL = "https://www.petrolimex.com.vn/"
+WEBTYGIA_URL = "https://webtygia.com/gia-xang-dau.html"
 VCB_EXCHANGE_RATE_URL = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx?b=68"
 
 # ─── Product display config ─────────────────────────────────
+# Keys match webtygia.com cell text (may be shortened, e.g. "hỏa 2-K")
 VN_FUEL_NAMES = {
-    "Xăng RON 95-V": "⛽ Xăng RON 95-V",
-    "Xăng RON 95-III": "⛽ Xăng RON 95-III",
-    "Xăng E10 RON 95-III": "⛽ Xăng E10 RON 95-III",
-    "Xăng E5 RON 92-II": "⛽ Xăng E5 RON 92",
+    "RON 95-III": "⛽ Xăng RON 95-III",
+    "RON 95-V": "⛽ Xăng RON 95-V",
+    "E10 RON 95-III": "⛽ Xăng E10 RON 95-III",
+    "E5 RON 92-II": "⛽ Xăng E5 RON 92",
     "DO 0,001S-V": "🏭 Diesel 0,001S-V",
     "DO 0,05S-II": "🏭 Diesel 0,05S-II",
+    "hỏa 2-K": "🪔 Dầu hỏa",
     "Dầu hỏa 2-K": "🪔 Dầu hỏa",
-    # Fallback keys (partial match)
-    "RON 95-V": "⛽ Xăng RON 95-V",
-    "RON 95-III": "⛽ Xăng RON 95-III",
-    "E5 RON 92-II": "⛽ Xăng E5 RON 92",
-    "Dầu hỏa": "🪔 Dầu hỏa",
 }
 
 HEADERS = {
@@ -51,94 +48,103 @@ HEADERS = {
 
 
 # ═════════════════════════════════════════════════════════════
-#  Petrolimex Scraper
+#  Vietnam Fuel Price Scraper
 # ═════════════════════════════════════════════════════════════
 
-def _scrape_petrolimex() -> dict:
+def _scrape_vn_prices() -> dict:
     """
-    Scrape fuel prices from Petrolimex website header table.
+    Scrape fuel prices from webtygia.com (static HTML).
+    Source data originates from Petrolimex official prices.
     Returns dict with fuel type -> price data.
     """
     result = {
         "prices": {},
         "update_time": "",
-        "source": "Petrolimex",
+        "source": "Petrolimex (via webtygia.com)",
         "error": None,
     }
 
     try:
         with httpx.Client(timeout=15, follow_redirects=True) as client:
-            response = client.get(PETROLIMEX_URL, headers=HEADERS)
+            response = client.get(WEBTYGIA_URL, headers=HEADERS)
             response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "lxml")
 
-        # ── Strategy 1: Header price table ──
-        price_div = soup.find("div", class_="header__pricePetrol")
-        if price_div:
-            table = price_div.find("table")
-            if table:
-                rows = table.find("tbody").find_all("tr") if table.find("tbody") else table.find_all("tr")
-                for row in rows:
-                    cells = row.find_all("td")
-                    if len(cells) >= 3:
-                        name = cells[0].get_text(strip=True)
-                        price_v1 = cells[1].get_text(strip=True)  # Vùng 1
-                        price_v2 = cells[2].get_text(strip=True)  # Vùng 2
+        # Find the FIRST table containing fuel prices (Petrolimex data)
+        # webtygia.com lists multiple companies; Table 0 = Petrolimex
+        tables = soup.find_all("table")
 
-                        # Parse price: "29.520" -> 29520
-                        price_v1_int = _parse_vn_price(price_v1)
-                        price_v2_int = _parse_vn_price(price_v2)
+        if tables:
+            fuel_table = tables[0]  # First table = Petrolimex prices
 
-                        if price_v1_int > 0:
-                            result["prices"][name] = {
-                                "name": VN_FUEL_NAMES.get(name, f"🛢️ {name}"),
-                                "price_v1": price_v1_int,
-                                "price_v2": price_v2_int,
-                                "price_v1_formatted": f"{price_v1_int:,.0f}",
-                                "price_v2_formatted": f"{price_v2_int:,.0f}",
-                                "unit": "đồng/lít",
-                            }
+        if fuel_table:
+            rows = fuel_table.find_all("tr")
+            data_count = 0
+            for row in rows:
+                cells = row.find_all(["td", "th"])
+                if len(cells) >= 3:
+                    name = cells[0].get_text(strip=True)
+                    price_v1_text = cells[1].get_text(strip=True)
+                    price_v2_text = cells[2].get_text(strip=True)
 
-            # Update time
-            info_p = price_div.find("p", class_="f-info")
-            if info_p:
-                result["update_time"] = info_p.get_text(strip=True)
+                    # Skip header row
+                    if "sản phẩm" in name.lower() or "vùng" in name.lower():
+                        continue
 
-        # ── Strategy 2: Fallback - scan article tables ──
+                    price_v1_int = _parse_vn_price(price_v1_text)
+                    price_v2_int = _parse_vn_price(price_v2_text)
+
+                    if price_v1_int > 0:
+                        display_name = VN_FUEL_NAMES.get(name, None)
+                        if not display_name:
+                            # Partial match fallback
+                            for key, val in VN_FUEL_NAMES.items():
+                                if key in name or name in key:
+                                    display_name = val
+                                    break
+                        if not display_name:
+                            display_name = f"🛢️ {name}"
+
+                        result["prices"][name] = {
+                            "name": display_name,
+                            "price_v1": price_v1_int,
+                            "price_v2": price_v2_int,
+                            "price_v1_formatted": f"{price_v1_int:,.0f}",
+                            "price_v2_formatted": f"{price_v2_int:,.0f}",
+                            "unit": "đồng/lít",
+                        }
+                        data_count += 1
+
+                    # Petrolimex block is the first 5 data rows
+                    # Stop before PV Oil / other company sections
+                    if data_count >= 5:
+                        break
+
+        # Extract update time from page
+        update_els = soup.find_all(
+            string=re.compile(r'cập nhật|hiệu lực|áp dụng|Giá xăng', re.IGNORECASE)
+        )
+        for el in update_els:
+            text = el.strip()
+            if re.search(r'\d{1,2}/\d{1,2}/\d{4}', text):
+                result["update_time"] = text
+                break
+
+        if not result["update_time"]:
+            result["update_time"] = f"Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+
         if not result["prices"]:
-            logger.warning("Header table not found, trying article tables...")
-            tables = soup.find_all("table")
-            for table in tables:
-                rows = table.find_all("tr")
-                for row in rows:
-                    cells = row.find_all(["td", "th"])
-                    if len(cells) >= 2:
-                        text = cells[0].get_text(strip=True)
-                        if any(kw in text.lower() for kw in ["ron", "diesel", "dầu hỏa", "do 0"]):
-                            price_text = cells[1].get_text(strip=True)
-                            price_int = _parse_vn_price(price_text)
-                            if price_int > 0:
-                                result["prices"][text] = {
-                                    "name": VN_FUEL_NAMES.get(text, f"🛢️ {text}"),
-                                    "price_v1": price_int,
-                                    "price_v2": 0,
-                                    "price_v1_formatted": f"{price_int:,.0f}",
-                                    "price_v2_formatted": "N/A",
-                                    "unit": "đồng/lít",
-                                }
+            result["error"] = "Không tìm thấy bảng giá xăng dầu"
 
-        if not result["prices"]:
-            result["error"] = "Không tìm thấy bảng giá trên website Petrolimex"
-
-        logger.info(f"Scraped {len(result['prices'])} fuel types from Petrolimex")
+        logger.info(f"Scraped {len(result['prices'])} fuel types from webtygia.com")
 
     except httpx.HTTPError as e:
-        result["error"] = f"Lỗi kết nối Petrolimex: {e}"
-        logger.error(f"HTTP error scraping Petrolimex: {e}")
+        result["error"] = f"Lỗi kết nối: {e}"
+        logger.error(f"HTTP error scraping fuel prices: {e}")
     except Exception as e:
         result["error"] = f"Lỗi xử lý dữ liệu: {e}"
-        logger.error(f"Error scraping Petrolimex: {e}")
+        logger.error(f"Error scraping fuel prices: {e}")
 
     return result
 
@@ -169,7 +175,7 @@ async def get_vn_fuel_prices(force_refresh: bool = False) -> dict:
         return _vn_cache
 
     loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, _scrape_petrolimex)
+    data = await loop.run_in_executor(None, _scrape_vn_prices)
 
     if data.get("prices"):
         _vn_cache = data
