@@ -21,15 +21,21 @@ VN_CACHE_TTL = timedelta(hours=6)
 RATE_CACHE_TTL = timedelta(minutes=30)
 
 # ─── URLs ────────────────────────────────────────────────────
+VNEXPRESS_TOPIC_URL = "https://vnexpress.net/chu-de/gia-xang-dau-3580"
 WEBTYGIA_URL = "https://webtygia.com/gia-xang-dau.html"
 VCB_EXCHANGE_RATE_URL = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx?b=68"
 
 # ─── Product display config ─────────────────────────────────
-# Keys match webtygia.com cell text (may be shortened, e.g. "hỏa 2-K")
 VN_FUEL_NAMES = {
+    # VNExpress names
+    "Xăng RON 95-III": "⛽ Xăng RON 95-III",
+    "Xăng E5 RON 92": "⛽ Xăng E5 RON 92",
+    "Dầu diesel": "🏭 Dầu Diesel",
+    "Dầu hoả": "🪔 Dầu hỏa",
+    "Dầu hỏa": "🪔 Dầu hỏa",
+    # webtygia.com names
     "RON 95-III": "⛽ Xăng RON 95-III",
     "RON 95-V": "⛽ Xăng RON 95-V",
-    "E10 RON 95-III": "⛽ Xăng E10 RON 95-III",
     "E5 RON 92-II": "⛽ Xăng E5 RON 92",
     "DO 0,001S-V": "🏭 Diesel 0,001S-V",
     "DO 0,05S-II": "🏭 Diesel 0,05S-II",
@@ -53,10 +59,126 @@ HEADERS = {
 
 def _scrape_vn_prices() -> dict:
     """
-    Scrape fuel prices from webtygia.com (static HTML).
-    Source data originates from Petrolimex official prices.
-    Returns dict with fuel type -> price data.
+    Scrape fuel prices using dual-source strategy:
+    1. VNExpress (primary) - latest fuel price article with table
+    2. webtygia.com (fallback) - Petrolimex prices with Vùng 1/2
     """
+    # Try VNExpress first
+    result = _scrape_vnexpress()
+    if result.get("prices"):
+        return result
+
+    # Fallback to webtygia.com
+    logger.info("VNExpress failed, trying webtygia.com fallback...")
+    return _scrape_webtygia()
+
+
+def _scrape_vnexpress() -> dict:
+    """Scrape fuel prices from latest VNExpress article."""
+    result = {
+        "prices": {},
+        "update_time": "",
+        "source": "VNExpress / Petrolimex",
+        "error": None,
+    }
+
+    try:
+        with httpx.Client(timeout=15, follow_redirects=True) as client:
+            # Step 1: Find latest fuel price article from topic page
+            resp = client.get(VNEXPRESS_TOPIC_URL, headers=HEADERS)
+            resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        # Find article links containing fuel price keywords
+        article_url = None
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            title = a.get_text(strip=True).lower()
+            if ("gia-xang" in href or "giá xăng" in title) and (
+                "tăng" in title or "giảm" in title or "không đổi" in title
+                or "điều chỉnh" in title
+            ):
+                if href.startswith("http"):
+                    article_url = href
+                elif href.startswith("/"):
+                    article_url = f"https://vnexpress.net{href}"
+                break
+
+        if not article_url:
+            result["error"] = "Không tìm thấy bài viết giá xăng trên VNExpress"
+            return result
+
+        logger.info(f"Found VNExpress article: {article_url}")
+
+        # Step 2: Scrape the article for price table
+        with httpx.Client(timeout=15, follow_redirects=True) as client:
+            resp2 = client.get(article_url, headers=HEADERS)
+            resp2.raise_for_status()
+
+        article_soup = BeautifulSoup(resp2.text, "lxml")
+
+        # Find price table (typically: Mặt hàng | Giá mới | Thay đổi)
+        tables = article_soup.find_all("table")
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all(["td", "th"])
+                if len(cells) >= 2:
+                    name = cells[0].get_text(strip=True)
+                    price_text = cells[1].get_text(strip=True)
+
+                    # Skip header
+                    if "mặt hàng" in name.lower() or "sản phẩm" in name.lower():
+                        continue
+
+                    price_int = _parse_vn_price(price_text)
+                    if price_int > 0:
+                        # Get price change if available
+                        change_text = ""
+                        if len(cells) >= 3:
+                            change_text = cells[2].get_text(strip=True)
+
+                        display_name = _get_display_name(name)
+
+                        result["prices"][name] = {
+                            "name": display_name,
+                            "price_v1": price_int,
+                            "price_v2": 0,  # VNExpress doesn't show Vùng 2
+                            "price_v1_formatted": f"{price_int:,.0f}",
+                            "price_v2_formatted": "—",
+                            "change": change_text,
+                            "unit": "đồng/lít",
+                        }
+
+        # Extract update time from article title or meta
+        title_el = article_soup.find("h1") or article_soup.find("title")
+        date_el = article_soup.find("span", class_="date")
+        if date_el:
+            result["update_time"] = date_el.get_text(strip=True)
+        elif title_el:
+            title_text = title_el.get_text(strip=True)
+            date_match = re.search(r'\d{1,2}/\d{1,2}', title_text)
+            if date_match:
+                result["update_time"] = f"Giá xăng ngày {date_match.group()}"
+
+        if not result["update_time"]:
+            result["update_time"] = f"Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+
+        if result["prices"]:
+            logger.info(f"Scraped {len(result['prices'])} fuel types from VNExpress")
+        else:
+            result["error"] = "Không tìm thấy bảng giá trong bài viết VNExpress"
+
+    except Exception as e:
+        result["error"] = f"Lỗi scrape VNExpress: {e}"
+        logger.error(f"Error scraping VNExpress: {e}")
+
+    return result
+
+
+def _scrape_webtygia() -> dict:
+    """Fallback: Scrape fuel prices from webtygia.com."""
     result = {
         "prices": {},
         "update_time": "",
@@ -70,17 +192,13 @@ def _scrape_vn_prices() -> dict:
             response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "lxml")
-
-        # Find the FIRST table containing fuel prices (Petrolimex data)
-        # webtygia.com lists multiple companies; Table 0 = Petrolimex
         tables = soup.find_all("table")
 
         if tables:
-            fuel_table = tables[0]  # First table = Petrolimex prices
-
-        if fuel_table:
+            fuel_table = tables[0]
             rows = fuel_table.find_all("tr")
             data_count = 0
+
             for row in rows:
                 cells = row.find_all(["td", "th"])
                 if len(cells) >= 3:
@@ -88,7 +206,6 @@ def _scrape_vn_prices() -> dict:
                     price_v1_text = cells[1].get_text(strip=True)
                     price_v2_text = cells[2].get_text(strip=True)
 
-                    # Skip header row
                     if "sản phẩm" in name.lower() or "vùng" in name.lower():
                         continue
 
@@ -96,15 +213,7 @@ def _scrape_vn_prices() -> dict:
                     price_v2_int = _parse_vn_price(price_v2_text)
 
                     if price_v1_int > 0:
-                        display_name = VN_FUEL_NAMES.get(name, None)
-                        if not display_name:
-                            # Partial match fallback
-                            for key, val in VN_FUEL_NAMES.items():
-                                if key in name or name in key:
-                                    display_name = val
-                                    break
-                        if not display_name:
-                            display_name = f"🛢️ {name}"
+                        display_name = _get_display_name(name)
 
                         result["prices"][name] = {
                             "name": display_name,
@@ -116,37 +225,32 @@ def _scrape_vn_prices() -> dict:
                         }
                         data_count += 1
 
-                    # Petrolimex block is the first 5 data rows
-                    # Stop before PV Oil / other company sections
                     if data_count >= 5:
                         break
 
-        # Extract update time from page
-        update_els = soup.find_all(
-            string=re.compile(r'cập nhật|hiệu lực|áp dụng|Giá xăng', re.IGNORECASE)
-        )
-        for el in update_els:
-            text = el.strip()
-            if re.search(r'\d{1,2}/\d{1,2}/\d{4}', text):
-                result["update_time"] = text
-                break
-
-        if not result["update_time"]:
-            result["update_time"] = f"Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        result["update_time"] = f"Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
 
         if not result["prices"]:
             result["error"] = "Không tìm thấy bảng giá xăng dầu"
 
         logger.info(f"Scraped {len(result['prices'])} fuel types from webtygia.com")
 
-    except httpx.HTTPError as e:
-        result["error"] = f"Lỗi kết nối: {e}"
-        logger.error(f"HTTP error scraping fuel prices: {e}")
     except Exception as e:
-        result["error"] = f"Lỗi xử lý dữ liệu: {e}"
-        logger.error(f"Error scraping fuel prices: {e}")
+        result["error"] = f"Lỗi scrape webtygia: {e}"
+        logger.error(f"Error scraping webtygia: {e}")
 
     return result
+
+
+def _get_display_name(name: str) -> str:
+    """Get emoji display name for a fuel product."""
+    display_name = VN_FUEL_NAMES.get(name)
+    if not display_name:
+        for key, val in VN_FUEL_NAMES.items():
+            if key in name or name in key:
+                display_name = val
+                break
+    return display_name or f"🛢️ {name}"
 
 
 def _parse_vn_price(text: str) -> int:
