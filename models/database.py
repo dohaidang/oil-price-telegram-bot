@@ -41,6 +41,24 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS daily_alert_users (
+                chat_id INTEGER PRIMARY KEY,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_id) REFERENCES users(chat_id)
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS volatility_alert_users (
+                chat_id INTEGER PRIMARY KEY,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_id) REFERENCES users(chat_id)
+            )
+        """)
+
         await db.commit()
         logger.info("Database initialized successfully")
 
@@ -180,4 +198,99 @@ async def is_vn_alert_subscribed(chat_id: int) -> bool:
         )
         row = await cursor.fetchone()
         return row is not None
+
+
+# ─── Daily Alert Subscriptions ─────────────────────────────────
+
+async def subscribe_daily_alert(chat_id: int) -> bool:
+    """Subscribe user to daily 7AM price reports."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO daily_alert_users (chat_id, enabled)
+            VALUES (?, 1)
+            ON CONFLICT(chat_id) DO UPDATE SET enabled = 1
+            """,
+            (chat_id,),
+        )
+        await db.commit()
+        return True
+
+async def unsubscribe_daily_alert(chat_id: int) -> bool:
+    """Unsubscribe user from daily price reports."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        cursor = await db.execute(
+            "UPDATE daily_alert_users SET enabled = 0 WHERE chat_id = ?",
+            (chat_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+async def get_all_daily_alert_users() -> list:
+    """Get all users subscribed to daily price reports."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT chat_id FROM daily_alert_users WHERE enabled = 1"
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+async def is_daily_alert_subscribed(chat_id: int) -> bool:
+    """Check if a user is subscribed to daily alerts."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT enabled FROM daily_alert_users WHERE chat_id = ? AND enabled = 1",
+            (chat_id,),
+        )
+        row = await cursor.fetchone()
+        return row is not None
+
+
+# ─── Volatility Alert Subscriptions ────────────────────────────
+
+async def subscribe_volatility_alert(chat_id: int) -> bool:
+    """Subscribe user to volatility alerts."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO volatility_alert_users (chat_id, enabled)
+            VALUES (?, 1)
+            ON CONFLICT(chat_id) DO UPDATE SET enabled = 1
+            """,
+            (chat_id,),
+        )
+        await db.commit()
+        return True
+
+async def unsubscribe_volatility_alert(chat_id: int) -> bool:
+    """Unsubscribe user from volatility alerts."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        cursor = await db.execute(
+            "UPDATE volatility_alert_users SET enabled = 0 WHERE chat_id = ?",
+            (chat_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+async def get_all_volatility_alert_users() -> list:
+    """Get all users subscribed to volatility alerts."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT chat_id FROM volatility_alert_users WHERE enabled = 1"
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+async def is_volatility_alert_subscribed(chat_id: int) -> bool:
+    """Check if a user is subscribed to volatility alerts."""
+    async with aiosqlite.connect(Config.DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT enabled FROM volatility_alert_users WHERE chat_id = ? AND enabled = 1",
+            (chat_id,),
+        )
+        row = await cursor.fetchone()
+        return row is not None
+
 
