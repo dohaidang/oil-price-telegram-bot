@@ -50,8 +50,7 @@ def build_price_message(prices: dict) -> str:
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
     lines.append(f"🕐 Cập nhật: {format_timestamp()}")
-    lines.append("")
-    lines.append("💡 <i>Dữ liệu từ Yahoo Finance</i>")
+
 
     return "\n".join(lines)
 

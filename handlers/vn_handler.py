@@ -50,8 +50,7 @@ async def vn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append(f"🕐 {update_time}")
-        lines.append("")
-        lines.append("💡 <i>Nguồn: Petrolimex (petrolimex.com.vn)</i>")
+
 
         keyboard = [
             [
@@ -219,8 +218,7 @@ async def vn_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append(f"🕐 {update_time}")
-        lines.append("")
-        lines.append("💡 <i>Nguồn: Petrolimex (petrolimex.com.vn)</i>")
+
 
         keyboard = [
             [
