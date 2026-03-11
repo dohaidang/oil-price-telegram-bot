@@ -21,16 +21,23 @@ VN_CACHE_TTL = timedelta(hours=6)
 RATE_CACHE_TTL = timedelta(minutes=30)
 
 # ─── URLs ────────────────────────────────────────────────────
-PETROLIMEX_URL = "https://www.petrolimex.com.vn/san-pham-dich-vu/gia-ban-le-xang-dau/gia-ban-le-xang-dau-trong-nuoc.html"
+PETROLIMEX_URL = "https://www.petrolimex.com.vn/"
 VCB_EXCHANGE_RATE_URL = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx?b=68"
 
 # ─── Product display config ─────────────────────────────────
 VN_FUEL_NAMES = {
+    "Xăng RON 95-V": "⛽ Xăng RON 95-V",
+    "Xăng RON 95-III": "⛽ Xăng RON 95-III",
+    "Xăng E10 RON 95-III": "⛽ Xăng E10 RON 95-III",
+    "Xăng E5 RON 92-II": "⛽ Xăng E5 RON 92",
+    "DO 0,001S-V": "🏭 Diesel 0,001S-V",
+    "DO 0,05S-II": "🏭 Diesel 0,05S-II",
+    "Dầu hỏa 2-K": "🪔 Dầu hỏa",
+    # Fallback keys (partial match)
     "RON 95-V": "⛽ Xăng RON 95-V",
     "RON 95-III": "⛽ Xăng RON 95-III",
     "E5 RON 92-II": "⛽ Xăng E5 RON 92",
-    "DO 0,05S-II": "🏭 Dầu Diesel 0.05S",
-    "Dầu hỏa 2-K": "🪔 Dầu hỏa",
+    "Dầu hỏa": "🪔 Dầu hỏa",
 }
 
 HEADERS = {
