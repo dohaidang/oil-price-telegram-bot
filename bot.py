@@ -166,6 +166,10 @@ def main():
     else:
         logger.warning("Job queue not available. Alerts will not be checked automatically.")
 
+    # Keep alive server for Render
+    from keep_alive import keep_alive
+    keep_alive()
+
     # Start polling
     logger.info("Bot is running! Press Ctrl+C to stop.")
     application.run_polling(
