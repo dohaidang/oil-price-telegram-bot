@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import Config
-from models.database import add_alert, get_user_alerts, delete_alert
+from models.database import add_alert, get_user_alerts, delete_alert, subscribe_vn_alert, unsubscribe_vn_alert, is_vn_alert_subscribed
 from services.oil_price_service import get_valid_oil_types
 from utils.formatter import format_price
 from utils.logger import setup_logger
@@ -18,9 +18,12 @@ async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🔔 <b>CẢNH BÁO GIÁ DẦU</b>\n\n"
             "📝 <b>Cách sử dụng:</b>\n\n"
-            "➕ <b>Thêm cảnh báo:</b>\n"
+            "➕ <b>Cảnh báo giá thế giới:</b>\n"
             "  <code>/alert wti above 80</code> - Báo khi WTI > $80\n"
             "  <code>/alert brent below 75</code> - Báo khi Brent < $75\n\n"
+            "🇻🇳 <b>Cảnh báo giá VN:</b>\n"
+            "  <code>/alert vn on</code> - Bật thông báo giá mới Petrolimex\n"
+            "  <code>/alert vn off</code> - Tắt thông báo\n\n"
             "📋 <b>Xem danh sách:</b>\n"
             "  <code>/alert list</code>\n\n"
             "🗑️ <b>Xóa cảnh báo:</b>\n"
@@ -30,6 +33,11 @@ async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     sub_command = args[0].lower()
+
+    # /alert vn on/off
+    if sub_command == "vn":
+        await _handle_alert_vn(update, args)
+        return
 
     # /alert list
     if sub_command == "list":
@@ -164,5 +172,51 @@ async def _handle_alert_delete(update: Update, alert_id: int):
     else:
         await update.message.reply_text(
             f"❌ Không tìm thấy cảnh báo #{alert_id} hoặc không thuộc về bạn.",
+            parse_mode="HTML",
+        )
+
+
+async def _handle_alert_vn(update: Update, args: list):
+    """Handle /alert vn on/off - subscribe to Petrolimex price updates."""
+    chat_id = update.effective_user.id
+
+    if len(args) < 2:
+        is_subscribed = await is_vn_alert_subscribed(chat_id)
+        status = "✅ Đang bật" if is_subscribed else "❌ Đang tắt"
+        await update.message.reply_text(
+            f"🇻🇳 <b>Cảnh báo giá xăng VN</b>\n\n"
+            f"📌 Trạng thái: {status}\n\n"
+            f"Bật: <code>/alert vn on</code>\n"
+            f"Tắt: <code>/alert vn off</code>\n\n"
+            f"💡 Khi bật, bot sẽ tự động thông báo khi Petrolimex công bố giá mới.",
+            parse_mode="HTML",
+        )
+        return
+
+    action = args[1].lower()
+
+    if action == "on":
+        await subscribe_vn_alert(chat_id)
+        await update.message.reply_text(
+            "✅ <b>Đã bật cảnh báo giá xăng VN!</b>\n\n"
+            "🔔 Bot sẽ thông báo khi Petrolimex công bố giá mới.\n"
+            "📌 Kiểm tra mỗi 6 giờ.\n\n"
+            "Tắt: <code>/alert vn off</code>",
+            parse_mode="HTML",
+        )
+        logger.info(f"User {chat_id} subscribed to VN price alerts")
+
+    elif action == "off":
+        await unsubscribe_vn_alert(chat_id)
+        await update.message.reply_text(
+            "🔕 <b>Đã tắt cảnh báo giá xăng VN.</b>\n\n"
+            "Bật lại: <code>/alert vn on</code>",
+            parse_mode="HTML",
+        )
+        logger.info(f"User {chat_id} unsubscribed from VN price alerts")
+
+    else:
+        await update.message.reply_text(
+            "❌ Sử dụng <code>/alert vn on</code> hoặc <code>/alert vn off</code>",
             parse_mode="HTML",
         )

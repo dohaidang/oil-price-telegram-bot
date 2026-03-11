@@ -15,13 +15,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton("📊 Giá dầu", callback_data="cmd_price"),
-            InlineKeyboardButton("📈 Biểu đồ", callback_data="cmd_chart_menu"),
+            InlineKeyboardButton("🇻🇳 Giá VN", callback_data="cmd_vn_refresh"),
         ],
         [
-            InlineKeyboardButton("🔔 Cảnh báo", callback_data="cmd_alert_list"),
+            InlineKeyboardButton("📈 Biểu đồ", callback_data="cmd_chart_menu"),
             InlineKeyboardButton("📰 Phân tích", callback_data="cmd_news"),
         ],
         [
+            InlineKeyboardButton("🔔 Cảnh báo", callback_data="cmd_alert_list"),
             InlineKeyboardButton("❓ Trợ giúp", callback_data="cmd_help"),
         ],
     ]
@@ -31,10 +32,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👋 Xin chào <b>{user.first_name}</b>!\n\n"
         "🛢️ Tôi là <b>Oil Price Bot</b> - trợ lý theo dõi giá dầu thô toàn cầu.\n\n"
         "📊 Tôi có thể giúp bạn:\n"
-        "  • Xem giá dầu thời gian thực\n"
+        "  • Xem giá dầu thế giới thời gian thực\n"
+        "  • 🇻🇳 Giá xăng dầu Việt Nam (Petrolimex)\n"
         "  • Tạo biểu đồ xu hướng giá\n"
         "  • Đặt cảnh báo khi giá đạt ngưỡng\n"
-        "  • Phân tích tình hình thị trường\n\n"
+        "  • Phân tích tác động giá thế giới → giá VN\n\n"
         "👇 <b>Chọn chức năng bên dưới hoặc gõ lệnh:</b>"
     )
 
@@ -50,10 +52,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "📖 <b>HƯỚNG DẪN SỬ DỤNG</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📊 <b>Xem giá dầu:</b>\n"
+        "📊 <b>Giá dầu thế giới:</b>\n"
         "  /price - Tất cả loại dầu\n"
         "  /price wti - Giá WTI chi tiết\n"
         "  /price brent - Giá Brent chi tiết\n\n"
+        "🇻🇳 <b>Giá xăng dầu Việt Nam:</b>\n"
+        "  /vn - Giá Petrolimex hiện tại\n"
+        "  /vn compare - So sánh VN vs thế giới\n\n"
         "📈 <b>Biểu đồ:</b>\n"
         "  /chart wti 1m - WTI 1 tháng\n"
         "  /chart brent 3m - Brent 3 tháng\n"
@@ -63,10 +68,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔔 <b>Cảnh báo giá:</b>\n"
         "  /alert wti above 80 - Báo khi WTI > $80\n"
         "  /alert brent below 75 - Báo khi Brent < $75\n"
+        "  /alert vn on - Bật thông báo giá VN mới\n"
         "  /alert list - Xem danh sách cảnh báo\n"
         "  /alert delete 1 - Xóa cảnh báo #1\n\n"
         "📰 <b>Phân tích:</b>\n"
-        "  /news - Tổng quan thị trường\n\n"
+        "  /news - Tổng quan thị trường + tác động đến VN\n\n"
         "🛢️ <b>Các loại dầu:</b>\n"
         "  <code>wti</code> - WTI Crude Oil\n"
         "  <code>brent</code> - Brent Crude Oil\n"
