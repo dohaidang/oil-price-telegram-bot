@@ -19,7 +19,7 @@ class Config:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
     # Database
-    DB_PATH: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oil_bot.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
     # Oil type tickers for yfinance
     OIL_TICKERS = {
