@@ -40,11 +40,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👇 <b>Chọn chức năng bên dưới hoặc gõ lệnh:</b>"
     )
 
-    await update.message.reply_text(
-        welcome_text,
-        parse_mode="HTML",
-        reply_markup=reply_markup,
-    )
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            welcome_text,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+        )
+    else:
+        await update.message.reply_text(
+            welcome_text,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+        )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,4 +89,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  <code>gasoline</code> - Xăng RBOB\n"
     )
 
-    await update.message.reply_text(help_text, parse_mode="HTML")
+    if update.callback_query:
+        await update.callback_query.answer()
+        keyboard = [[InlineKeyboardButton("⬅️ Bảng điều khiển", callback_data="cmd_start")]]
+        await update.callback_query.edit_message_text(
+            help_text, 
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text(help_text, parse_mode="HTML")

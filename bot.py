@@ -132,6 +132,10 @@ def main():
         pattern=r"^cmd_help$",
     ))
     application.add_handler(CallbackQueryHandler(
+        lambda update, context: start_command(update, context),
+        pattern=r"^cmd_start$",
+    ))
+    application.add_handler(CallbackQueryHandler(
         lambda update, context: news_command(update, context), 
         pattern=r"^cmd_news$",
     ))
