@@ -48,6 +48,33 @@ class Config:
         "GASOLINE": "USD/gallon",
     }
 
+    # ─── Gold Configuration ──────────────────────────────────
+    GOLD_WORLD_TICKERS = {
+        "XAUUSD": "XAUUSD=X",
+    }
+
+    GOLD_WORLD_NAMES = {
+        "XAUUSD": "🥇 Vàng (XAUUSD)",
+    }
+
+    GOLD_WORLD_UNITS = {
+        "XAUUSD": "USD/oz",
+    }
+
+    GOLD_VN_BRANDS = ["SJC", "DOJI", "PNJ"]
+
+    GOLD_VN_SOURCES = {
+        "SJC": "https://sjc.com.vn/giavang/textContent.php",
+        "DOJI": "https://www.doji.vn/bang-gia-vang/",
+        "PNJ": "https://www.pnj.com.vn/blog/gia-vang/",
+    }
+
+    # 1 troy oz = 31.1035g, 1 chỉ = 3.75g
+    TROY_OZ_GRAMS = 31.1035
+    CHI_GRAMS = 3.75
+
+    GOLD_VN_SNAPSHOT_INTERVAL: int = int(os.getenv("GOLD_VN_SNAPSHOT_INTERVAL", "60"))
+
     @classmethod
     def validate(cls) -> bool:
         """Validate required configuration."""
