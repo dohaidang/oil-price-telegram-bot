@@ -141,8 +141,10 @@ async def _handle_alert_list(update: Update):
     chat_id = update.effective_user.id
     alerts = await get_user_alerts(chat_id)
 
+    msg_target = update.effective_message
+
     if not alerts:
-        await update.message.reply_text(
+        await msg_target.reply_text(
             "📋 Bạn chưa có cảnh báo nào.\n\n"
             "➕ Tạo mới: <code>/alert wti above 80</code>",
             parse_mode="HTML",
@@ -162,7 +164,7 @@ async def _handle_alert_list(update: Update):
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
     lines.append("🗑️ Xóa: <code>/alert delete [ID]</code>")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+    await msg_target.reply_text("\n".join(lines), parse_mode="HTML")
 
 
 async def _handle_alert_delete(update: Update, alert_id: int):

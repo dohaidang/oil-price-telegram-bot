@@ -212,6 +212,20 @@ def main():
         pattern=r"^cmd_news$",
     ))
     application.add_handler(CallbackQueryHandler(vn_callback, pattern=r"^cmd_vn_"))
+
+    # Wire missing help-menu callbacks
+    async def _alert_list_callback(update, context):
+        await update.callback_query.answer()
+        context.args = ["list"]
+        await alert_command(update, context)
+
+    async def _chart_menu_callback(update, context):
+        await update.callback_query.answer()
+        context.args = []
+        await chart_command(update, context)
+
+    application.add_handler(CallbackQueryHandler(_alert_list_callback, pattern=r"^cmd_alert_list$"))
+    application.add_handler(CallbackQueryHandler(_chart_menu_callback, pattern=r"^cmd_chart_menu$"))
     
     # Helper to wrap subscription commands with args
     async def handle_sub_callback(update, context, cmd_func, action):
