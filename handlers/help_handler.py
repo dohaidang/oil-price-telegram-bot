@@ -94,13 +94,35 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  <code>gasoline</code> - Xăng RBOB\n"
     )
 
+    keyboard = [
+        [
+            InlineKeyboardButton("📊 Giá dầu", callback_data="cmd_price"),
+            InlineKeyboardButton("🇻🇳 Giá VN", callback_data="cmd_vn_refresh"),
+        ],
+        [
+            InlineKeyboardButton("📈 Biểu đồ", callback_data="cmd_chart_menu"),
+            InlineKeyboardButton("📰 Phân tích", callback_data="cmd_news"),
+        ],
+        [
+            InlineKeyboardButton("🌅 Bản tin Sáng", callback_data="cmd_daily"),
+            InlineKeyboardButton("⚡ Biến động", callback_data="cmd_volatility"),
+        ],
+        [
+            InlineKeyboardButton("🔔 Cảnh báo", callback_data="cmd_alert_list"),
+            InlineKeyboardButton("⬅️ Bảng điều khiển", callback_data="cmd_start"),
+        ],
+    ]
+
     if update.callback_query:
         await update.callback_query.answer()
-        keyboard = [[InlineKeyboardButton("⬅️ Bảng điều khiển", callback_data="cmd_start")]]
         await update.callback_query.edit_message_text(
             help_text, 
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        await update.message.reply_text(help_text, parse_mode="HTML")
+        await update.message.reply_text(
+            help_text, 
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
