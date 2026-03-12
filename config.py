@@ -75,6 +75,32 @@ class Config:
 
     GOLD_VN_SNAPSHOT_INTERVAL: int = int(os.getenv("GOLD_VN_SNAPSHOT_INTERVAL", "60"))
 
+    # ─── Silver Configuration ────────────────────────────────
+    SILVER_WORLD_TICKERS = {
+        "XAGUSD": "XAGUSD=X",
+    }
+
+    SILVER_WORLD_NAMES = {
+        "XAGUSD": "🥈 Bạc (XAGUSD)",
+    }
+
+    SILVER_WORLD_UNITS = {
+        "XAGUSD": "USD/oz",
+    }
+
+    SILVER_VN_BRANDS = ["SJC", "DOJI", "PNJ"]
+
+    SILVER_VN_SOURCES = {
+        # SJC: same page as gold, search for "bạc" rows
+        "SJC": "https://sjc.com.vn/giavang/textContent.php",
+        # DOJI: dedicated silver page (may not exist — graceful fallback)
+        "DOJI": "https://www.doji.vn/bang-gia-bac/",
+        # PNJ: gold/silver combined page (search for silver rows)
+        "PNJ": "https://www.pnj.com.vn/blog/gia-vang/",
+    }
+
+    SILVER_VN_SNAPSHOT_INTERVAL: int = int(os.getenv("SILVER_VN_SNAPSHOT_INTERVAL", "60"))
+
     @classmethod
     def validate(cls) -> bool:
         """Validate required configuration."""

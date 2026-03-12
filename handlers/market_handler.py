@@ -14,7 +14,7 @@ def _build_market_menu() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🥇 Vàng", callback_data="market_gold"),
         ],
         [
-            InlineKeyboardButton("🥈 Bạc (sắp có)", callback_data="market_soon"),
+            InlineKeyboardButton("🥈 Bạc", callback_data="market_silver"),
             InlineKeyboardButton("📈 Cổ phiếu (sắp có)", callback_data="market_soon"),
         ],
         [
@@ -55,6 +55,10 @@ async def market_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "market_gold":
         from handlers.gold_handler import gold_menu
         await gold_menu(update, context)
+
+    elif data == "market_silver":
+        from handlers.silver_handler import silver_menu
+        await silver_menu(update, context)
 
     elif data == "market_soon":
         await query.answer("🔜 Tính năng này sẽ sớm ra mắt!", show_alert=True)
