@@ -13,6 +13,12 @@ logger = setup_logger("alert_handler")
 async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /alert command - manage price alerts."""
     args = context.args
+    user = update.effective_user
+    chat_id = user.id
+    
+    # Ensure user exists in database to prevent ForeignKeyViolationError
+    from models.database import upsert_user
+    await upsert_user(chat_id, user.username, user.first_name)
 
     if not args:
         await update.message.reply_text(

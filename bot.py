@@ -184,6 +184,39 @@ def main():
         pattern=r"^cmd_news$",
     ))
     application.add_handler(CallbackQueryHandler(vn_callback, pattern=r"^cmd_vn_"))
+    
+    # Helper to wrap subscription commands with args
+    async def handle_sub_callback(update, context, cmd_func, action):
+        # Inject args into context so the command handler sees them
+        context.args = [action] if action else []
+        await cmd_func(update, context)
+
+    # Callback handlers for daily and volatility from main menu
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, daily_command, None),
+        pattern=r"^cmd_daily$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, daily_command, "on"),
+        pattern=r"^cmd_daily_on$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, daily_command, "off"),
+        pattern=r"^cmd_daily_off$"
+    ))
+    
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, volatility_command, None),
+        pattern=r"^cmd_volatility$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, volatility_command, "on"),
+        pattern=r"^cmd_volatility_on$"
+    ))
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: handle_sub_callback(update, context, volatility_command, "off"),
+        pattern=r"^cmd_volatility_off$"
+    ))
 
     # Register error handler
     application.add_error_handler(error_handler)

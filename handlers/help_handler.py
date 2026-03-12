@@ -22,6 +22,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📰 Phân tích", callback_data="cmd_news"),
         ],
         [
+            InlineKeyboardButton("🌅 Bản tin Sáng", callback_data="cmd_daily"),
+            InlineKeyboardButton("⚡ Biến động", callback_data="cmd_volatility"),
+        ],
+        [
             InlineKeyboardButton("🔔 Cảnh báo", callback_data="cmd_alert_list"),
             InlineKeyboardButton("❓ Trợ giúp", callback_data="cmd_help"),
         ],
@@ -75,12 +79,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  1d, 5d, 1m, 3m, 6m, 1y, 2y, 5y\n\n"
         "🔔 <b>Cảnh báo giá:</b>\n"
         "  /alert wti above 80 - Báo khi WTI &gt; $80\n"
-        "  /alert brent below 75 - Báo khi Brent &lt; $75\n"
         "  /alert vn on - Bật thông báo giá VN mới\n"
         "  /alert list - Xem danh sách cảnh báo\n"
         "  /alert delete 1 - Xóa cảnh báo #1\n\n"
-        "📰 <b>Phân tích:</b>\n"
-        "  /news - Tổng quan thị trường + tác động đến VN\n\n"
+        "📰 <b>Bản tin & Phân tích:</b>\n"
+        "  /news - Tổng quan thị trường + tác động đến VN\n"
+        "  /daily - Đăng ký bản tin sáng hàng ngày\n"
+        "  /volatility - Báo động khi giá biến động mạnh\n\n"
         "🛢️ <b>Các loại dầu:</b>\n"
         "  <code>wti</code> - WTI Crude Oil\n"
         "  <code>brent</code> - Brent Crude Oil\n"
