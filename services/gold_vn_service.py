@@ -14,7 +14,7 @@ logger = setup_logger("gold_vn_service")
 
 _vn_gold_cache: dict = {}
 _vn_gold_cache_time: Optional[datetime] = None
-VN_GOLD_CACHE_TTL = timedelta(minutes=15)
+VN_GOLD_CACHE_TTL = timedelta(minutes=5)
 
 HEADERS = {
     "User-Agent": (
@@ -229,11 +229,21 @@ async def get_gold_vn_prices(force_refresh: bool = False) -> dict:
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(None, _fetch_all_gold_vn)
 
-    has_data = any(v.get("sell", 0) > 0 for v in data.values())
+    # Check if the new scrape produced any usable data
+    has_data = any(
+        (v.get("sell", 0) > 0) or (v.get("buy", 0) > 0) for v in data.values()
+    )
     if has_data:
         _vn_gold_cache = data
         _vn_gold_cache_time = datetime.now()
+        return data
 
+    # If no data but we have previous cache, fall back to cached values
+    if _vn_gold_cache:
+        logger.warning("Gold VN scrape returned no data; falling back to cached values")
+        return _vn_gold_cache
+
+    # No cache and no data — return raw (zeros) result
     return data
 
 

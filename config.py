@@ -64,8 +64,11 @@ class Config:
     GOLD_VN_BRANDS = ["SJC", "DOJI", "PNJ"]
 
     GOLD_VN_SOURCES = {
-        "SJC": "https://sjc.com.vn/giavang/textContent.php",
-        "DOJI": "https://www.doji.vn/bang-gia-vang/",
+        # SJC: public online price table
+        "SJC": "https://sjc.com.vn/gia-vang-online",
+        # DOJI: new online price portal
+        "DOJI": "https://giavang.doji.vn/trangchu.html",
+        # PNJ: consolidated gold price page (kept as-is; may redirect internally)
         "PNJ": "https://www.pnj.com.vn/blog/gia-vang/",
     }
 
