@@ -31,7 +31,8 @@ async def chart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         ])
 
-        await update.message.reply_text(
+        msg_target = update.effective_message
+        await msg_target.reply_text(
             "📈 <b>BIỂU ĐỒ GIÁ DẦU</b>\n\n"
             "Chọn loại dầu bên dưới hoặc gõ lệnh:\n"
             "<code>/chart wti 1m</code>\n"

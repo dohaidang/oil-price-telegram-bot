@@ -17,7 +17,14 @@ from handlers.alert_handler import alert_command
 from handlers.news_handler import news_command, build_news_message
 from handlers.vn_handler import vn_command, vn_callback
 from handlers.subscription_handler import daily_command, volatility_command
+from handlers.market_handler import market_command, market_callback
+from handlers.gold_handler import gold_command, gold_callback
+from handlers.silver_handler import silver_command, silver_callback
 from services.alert_service import check_alerts, check_volatility
+from services.gold_alert_service import check_gold_alerts
+from services.gold_vn_service import snapshot_gold_vn_to_db
+from services.silver_alert_service import check_silver_alerts
+from services.silver_vn_service import snapshot_silver_vn_to_db
 from services.vn_price_service import check_price_change, get_vn_fuel_prices, get_usd_vnd_rate
 from services.oil_price_service import get_current_prices
 from models.database import get_all_vn_alert_users, get_all_daily_alert_users
@@ -35,10 +42,13 @@ async def post_init(application: Application):
     # Set bot commands menu
     commands = [
         BotCommand("start", "Khởi động bot"),
+        BotCommand("market", "Bảng giá thị trường (Dầu, Vàng, ...)"),
+        BotCommand("gold", "Giá vàng thế giới & Việt Nam"),
+        BotCommand("silver", "Giá bạc thế giới & Việt Nam"),
         BotCommand("price", "Xem giá dầu thế giới"),
         BotCommand("vn", "Giá xăng dầu Việt Nam"),
         BotCommand("chart", "Biểu đồ giá dầu"),
-        BotCommand("alert", "Quản lý cảnh báo giá mục tiêu"),
+        BotCommand("alert", "Quản lý cảnh báo giá dầu"),
         BotCommand("news", "Phân tích thị trường"),
         BotCommand("daily", "Đăng ký nhận bản tin 7h sáng"),
         BotCommand("volatility", "Đăng ký cảnh báo biến động giá mạnh"),
@@ -136,6 +146,40 @@ async def vn_price_alert_job(context):
         logger.error(f"Error in vn_price_alert_job: {e}")
 
 
+async def gold_alert_job(context):
+    """Scheduled job to check gold price alerts."""
+    logger.debug("Running gold alert check...")
+    triggered = await check_gold_alerts(context.bot)
+    if triggered:
+        logger.info(f"Triggered {len(triggered)} gold alert(s): {triggered}")
+
+
+async def gold_vn_snapshot_job(context):
+    """Scheduled job to snapshot VN gold prices to DB for charting."""
+    logger.debug("Running gold VN snapshot...")
+    try:
+        await snapshot_gold_vn_to_db()
+    except Exception as e:
+        logger.error(f"Error in gold_vn_snapshot_job: {e}")
+
+
+async def silver_alert_job(context):
+    """Scheduled job to check silver price alerts."""
+    logger.debug("Running silver alert check...")
+    triggered = await check_silver_alerts(context.bot)
+    if triggered:
+        logger.info(f"Triggered {len(triggered)} silver alert(s): {triggered}")
+
+
+async def silver_vn_snapshot_job(context):
+    """Scheduled job to snapshot VN silver prices to DB for charting."""
+    logger.debug("Running silver VN snapshot...")
+    try:
+        await snapshot_silver_vn_to_db()
+    except Exception as e:
+        logger.error(f"Error in silver_vn_snapshot_job: {e}")
+
+
 async def error_handler(update: Update, context):
     """Handle errors."""
     logger.error(f"Exception while handling update: {context.error}", exc_info=context.error)
@@ -160,6 +204,9 @@ def main():
     # Register command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("market", market_command))
+    application.add_handler(CommandHandler("gold", gold_command))
+    application.add_handler(CommandHandler("silver", silver_command))
     application.add_handler(CommandHandler("price", price_command))
     application.add_handler(CommandHandler("chart", chart_command))
     application.add_handler(CommandHandler("alert", alert_command))
@@ -168,7 +215,11 @@ def main():
     application.add_handler(CommandHandler("daily", daily_command))
     application.add_handler(CommandHandler("volatility", volatility_command))
 
-    # Register callback query handlers
+    # Register callback query handlers — market, gold, silver first (more specific)
+    application.add_handler(CallbackQueryHandler(market_callback, pattern=r"^market_"))
+    application.add_handler(CallbackQueryHandler(gold_callback, pattern=r"^gold_"))
+    application.add_handler(CallbackQueryHandler(silver_callback, pattern=r"^silver_"))
+
     application.add_handler(CallbackQueryHandler(price_callback, pattern=r"^(cmd_price|cmd_price_refresh|price_)"))
     application.add_handler(CallbackQueryHandler(chart_callback, pattern=r"^chart_"))
     application.add_handler(CallbackQueryHandler(
@@ -184,6 +235,20 @@ def main():
         pattern=r"^cmd_news$",
     ))
     application.add_handler(CallbackQueryHandler(vn_callback, pattern=r"^cmd_vn_"))
+
+    # Wire missing help-menu callbacks
+    async def _alert_list_callback(update, context):
+        await update.callback_query.answer()
+        context.args = ["list"]
+        await alert_command(update, context)
+
+    async def _chart_menu_callback(update, context):
+        await update.callback_query.answer()
+        context.args = []
+        await chart_command(update, context)
+
+    application.add_handler(CallbackQueryHandler(_alert_list_callback, pattern=r"^cmd_alert_list$"))
+    application.add_handler(CallbackQueryHandler(_chart_menu_callback, pattern=r"^cmd_chart_menu$"))
     
     # Helper to wrap subscription commands with args
     async def handle_sub_callback(update, context, cmd_func, action):
@@ -248,6 +313,42 @@ def main():
             name="vn_price_check",
         )
         logger.info("VN price change check scheduled every 6 hours")
+
+        # Gold alert check every 10 minutes
+        job_queue.run_repeating(
+            gold_alert_job,
+            interval=10 * 60,
+            first=90,
+            name="gold_alert_check",
+        )
+        logger.info("Gold alert check scheduled every 10 minutes")
+
+        # Gold VN snapshot every hour
+        job_queue.run_repeating(
+            gold_vn_snapshot_job,
+            interval=Config.GOLD_VN_SNAPSHOT_INTERVAL * 60,
+            first=180,
+            name="gold_vn_snapshot",
+        )
+        logger.info(f"Gold VN snapshot scheduled every {Config.GOLD_VN_SNAPSHOT_INTERVAL} minutes")
+
+        # Silver alert check every 10 minutes
+        job_queue.run_repeating(
+            silver_alert_job,
+            interval=10 * 60,
+            first=95,
+            name="silver_alert_check",
+        )
+        logger.info("Silver alert check scheduled every 10 minutes")
+
+        # Silver VN snapshot every hour
+        job_queue.run_repeating(
+            silver_vn_snapshot_job,
+            interval=Config.SILVER_VN_SNAPSHOT_INTERVAL * 60,
+            first=240,
+            name="silver_vn_snapshot",
+        )
+        logger.info(f"Silver VN snapshot scheduled every {Config.SILVER_VN_SNAPSHOT_INTERVAL} minutes")
     else:
         logger.warning("Job queue not available. Alerts will not be checked automatically.")
 
